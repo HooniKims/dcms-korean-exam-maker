@@ -1,4 +1,4 @@
 interface:
   display_name: "시험문제 출제"
-  short_description: "시험문제 제작·Windows 한글 직접 편집·원안지 전체 레이아웃 검증"
-  default_prompt: "$exam-maker를 사용해 현재 폴더의 자료와 학교 지침을 확인하고 시험문제를 만들어 주세요. Windows에서는 Computer Use로 한글을 바로 열어 상단 정보와 본문을 편집하고, 저장·재열기·전체 쪽 PDF 검증을 거쳐 원안지 레이아웃을 유지해 주세요."
+  short_description: "자료로 과목을 파악하고 과목별 출제·정답 검토·한글 원안지 편집"
+  default_prompt: "$exam-maker를 사용해 현재 자료에서 과목과 출제 조건을 파악하고, 해당 과목의 성취기준·정답·채점 검토를 거쳐 문항을 만든 뒤 요청한 원안지를 실제 한글 편집과 전체 쪽 검증까지 진행해 주세요."

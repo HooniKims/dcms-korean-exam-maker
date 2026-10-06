@@ -2,6 +2,8 @@
 
 Read this reference when producing, repairing, or reviewing an editable exam document.
 
+Use the current profile from [subject-adaptation.md](subject-adaptation.md) for subject notation and answer space. Reusing a school's form does not carry over Korean-only paragraph labels, fixed Korean instructions or a five-choice requirement. Preserve equations, chemical formulas, foreign-language text, code indentation, maps and scores as appropriate; structural checks do not replace content and native visual verification of those elements.
+
 On Windows with Hancom, follow [native Computer Use editing](windows-hancom-computer-use.md) immediately. The earlier Mac deferral is not a Windows restriction. Use the existing real sample for a full exam test when asked; native save/reopen and all-page print checks are required. Preparing content through file tools is allowed, but opening a generated file alone is not evidence that direct in-app editing works.
 
 ## Supplied Deungchon HWPX form
