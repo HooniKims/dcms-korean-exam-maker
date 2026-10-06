@@ -2,7 +2,7 @@
 name: exam-maker
 description: Infer the school subject and assessment needs from teacher-provided materials, then create original exam candidates and editable DOCX or HWPX documents with subject-specific answer and scoring checks. Use for 시험문제 출제, 중간고사·기말고사, 후보 문항, 출제 청사진, 성취기준 반영, 기출·출판사 문제 중복 검사, 난이도 조정, 원안지 편집, 학교 출제연수 지침 반영, or equivalent school-assessment work across subjects.
 metadata:
-  version: "1.9.1"
+  version: "1.9.2"
   updated: "2026-10-06"
 ---
 
@@ -66,7 +66,7 @@ Record the active duplicate set, reference-only files, excluded files, and reaso
 
 Create more complete candidates than the final required count. Give each candidate a clear answer, rationale, standard, assessed evidence, estimated difficulty, and estimated solving time. Offer a recommended combination plus substitutes so the teacher can choose and revise.
 
-For this teacher's exams, read [references/stem-balance.md](references/stem-balance.md) and plan approximately **70% positive and 30% negative stems by final multiple-choice item count**. With 22 multiple-choice items, use 15 positive and 7 negative. Label each candidate's polarity by what the student must select, exclude constructed responses from this ratio, and recheck the recommended and final sets after substitutions. Rebuild choices, answers and rationales when converting polarity; changing only the stem is insufficient. A current explicit override takes precedence.
+For this teacher's exams, read [references/stem-balance.md](references/stem-balance.md) and plan approximately **70% positive and 30% negative stems by final multiple-choice item count**. With 22 multiple-choice items, use 15 positive and 7 negative. Label each candidate's polarity by what the student must select, exclude constructed responses from this ratio, and recheck the recommended and final sets after substitutions. Rebuild choices, answers and rationales when converting polarity; changing only the stem is insufficient. Derive the teacher key and answer-position counts from the final numbered items, cross-check passage ranges and response conditions against the scoring criteria, then repaginate and verify the revised native document. A current explicit override takes precedence.
 
 Balance coverage through a blueprint rather than mechanically assigning one question to every guidebook detail. Use the derived subject profile to set assessed abilities, appropriate item formats, independent answer checks and partial-credit rules. Link each candidate to its actual source and assessment evidence. Recalculate score weights and expected mean whenever candidates are replaced.
 
