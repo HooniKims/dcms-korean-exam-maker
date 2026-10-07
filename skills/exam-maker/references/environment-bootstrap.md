@@ -1,30 +1,37 @@
-# 실행 환경 자동 준비와 한글 검색
+# 환경에 따른 한글·에디터 선택
 
-사용자 지정(2026-10-05): 이 스킬을 실행하면 HWPX 에디터 스킬과 필요한 Git·Node.js 등의 설치 여부를 검사하고, 없다면 안내 후 자동 설치한다. 이 사용자에게 같은 설치 허가를 다시 묻지 않는다. 시스템의 실제 권한 제한이나 보안 대화상자는 우회하지 않는다.
+사용자 최종 지정(2026-10-07): **무조건 에디터를 설치하지 않는다. Windows에 한글이 있으면 한글을 직접 사용하고, Mac에 한글이 없으면 에디터를 설치하여 확인한다.** 이 지정은 10월5일의 무조건 에디터 준비 기본값을 대체한다. 이미 설치된 에디터나 사용자 커스텀 스킬은 삭제하지 않는다.
 
-## 매 실행의 첫 단계
+## 첫 단계: 운영체제와 한글부터 확인
 
-1. OS와 스킬 경로를 확인한다. 사용자에게 “HWPX 에디터와 필요한 Git·Node.js·Python을 확인하고, 없는 구성요소만 자동 설치하겠습니다. 기존 설치는 재사용합니다.”라고 알린다. 설치 소요 시간이 길어지면 진행 상황을 알린다.
-2. `load_workspace_dependencies`가 있으면 호출해 번들 런타임을 먼저 확보한다. 명령 PATH에 없는 실제 실행 파일의 상위 폴더를 아래 `-RuntimeBin`에 전달할 수 있다. 이 문서의 사용자별 경로를 다른 PC에 하드코딩하지 않는다.
-3. Windows에서는 스킬의 **절대 경로**로 아래를 실행한다. `-Apply`가 빠지면 읽기 전용 점검이다. 보고서는 현재 작업 산출물 폴더에 둔다.
+1. OS, 설치된 한글 앱, 에이전트의 실제 Computer Use 기능을 확인한다. “운영체제와 한글 설치 여부를 확인한 뒤 필요한 구성요소만 준비하겠습니다.”라고 알린다. 설명·스킬 유지보수 요청에는 설치나 앱 실행이 필요 없다.
+2. **Windows + 한글:** Computer Use로 한글 작업 사본을 열어 수정·저장·PDF 출력·검수한다. rhwp 에디터 설치·빌드·스모크 검사·실행을 모두 생략한다. Git·Node·Python을 에디터 때문에 설치하지 않는다. 이미 설치된 HWPX 스킬에서 ‘결과를 항상 별도 에디터로 열기’를 요구해도 이 사용자의 한글 우선 결정이 우선이다.
+3. **Mac + 한글 없음:** HWPX 에디터를 설치하거나 기존 설치를 재사용하고, 실제 문서를 열어 표시를 확인한다. 에디터 화면 검수를 한글 조판 합격으로 표시하지 않는다.
+4. **Mac + 한글 있음:** 설치 앱과 지원되는 네이티브 제어를 우선 확인한다. Windows 전용 Computer Use/COM을 호출하지 않는다. Windows에서 한글이 없는 경우에도 에디터 대체 경로를 사용할 수 있다. 한글 UI의 일시적인 실패는 미설치가 아니므로 에디터를 자동 추가하지 않는다.
+5. XML/PDF 검사가 실제로 필요하면 번들 런타임(`load_workspace_dependencies`)이나 기존 Python과 필요한 라이브러리를 사용한다. 한글 직접 조작의 선행 설치 조건으로 만들지 않는다.
+
+## 환경 보고서
 
 ```powershell
 & '<스킬 절대경로>\scripts\bootstrap_windows.ps1' -Apply -Report '<산출물 절대경로>\exam-environment.json'
-# 번들 실행 파일 폴더가 필요한 경우:
-# -RuntimeBin @('<Python 폴더>','<Node 폴더>','<Git cmd 폴더>')
+# 에디터 경로에서 필요한 번들 런타임: -RuntimeBin @('<Python 폴더>','<Node 폴더>','<Git cmd 폴더>')
 ```
 
-4. `status=READY`와 `editor_smoke.status=PASS`를 확인한다. 파일 존재만으로 설치 성공을 판단하지 않는다. 새 HWPX 스킬을 설치했으면 실제 경로의 `SKILL.md`를 읽어 이번 작업에도 적용하고, “설치한 스킬은 다음 턴부터 자동 검색됩니다”라고 안내한다. 요청한 작업은 이번 턴에 계속한다.
-5. 결과의 `hancom` 목록과 Computer Use의 현재 `sky.list_apps()`/`sky.list_windows()`를 대조하여 실제 한글로 바로 이어간다. `native_layout_status=AVAILABLE_NOT_YET_VERIFIED`는 설치된 한글을 찾았다는 뜻이며, 문서 조판 합격이라는 뜻이 아니다.
+Windows 시작 스크립트는 레지스트리·설치 폴더·실행 중 앱에서 한글을 먼저 찾는다. 한글을 찾으면 **Python을 찾거나 설치하기 전에 종료**한다. Python 직접 진입점 `bootstrap_exam.py`도 한글 검색 직후 같은 네이티브 분기를 적용한다.
 
-## 자동 처리 범위
+- 네이티브 경로: `workflow=hancom`, `status=READY`, `editor_required=false`, `editor_smoke.status=SKIPPED_NATIVE`, `actions=[]`. Computer Use 지원은 에이전트에서 따로 확인한다. `native_layout_status=AVAILABLE_NOT_YET_VERIFIED`는 앱 발견일 뿐 문서 검수 합격이 아니다.
+- 에디터 경로: `workflow=editor`이며 아래 필요한 항목을 준비한다. `status=READY`와 `editor_smoke.status=PASS`를 확인한다. 파일 존재만으로 성공을 판단하지 않는다.
+- 사용자가 한글이 있어도 에디터를 명시적으로 요청한 경우에만 `-Editor` / `--editor`를 사용한다. 일반 HWPX 스킬 지침이나 UI 실패를 그 요청으로 간주하지 않는다.
 
-- HWPX 에디터는 [imsebeom/hwpx](https://github.com/imsebeom/hwpx)의 검증한 커밋 `abea249f05f4982a40bc56adf765ea5d32538c82`을 사용한다. Codex 내장 skill-installer의 `install-skill-from-github.py --path . --name hwpx`를 호출한다. 사용자 스킬 폴더는 `CODEX_HOME/skills`, 미설정 시 `~/.codex/skills`이다. 외부 문서의 Claude 전용 환경 변수는 Codex 경로로 바꿔 해석한다.
-- 이미 있는 `hwpx`는 pull·덮어쓰지 않는다. 필수 파일이 없는 기존 폴더는 손상/다른 버전으로 보고 그대로 보존하고 원인을 알린다. 사용자 커스텀 스킬을 자동으로 삭제하거나 대체하지 않는다.
-- 실행 가능한 Git, Node.js22.12 이상 및 npm, Python3.10 이상을 확인한다. Windows에서 없으면 WinGet의 정확한 ID `Git.Git`, `OpenJS.NodeJS.LTS`, `Python.Python.3.12`로 설치하고 실행을 재검사한다. 시스템 PATH를 덮어쓰지 않는다. 이미 작동하는 도구의 최신 버전 업데이트를 강요하지 않는다.
-- HWPX/XML/PDF 검증에 필요한 `lxml`, `python-hwpx`, `PyMuPDF`, `Pillow`가 없으면 `CODEX_HOME/cache/exam-maker/python`의 격리 환경에 설치한다. 그 후 보고서의 `python` 경로를 검증 스크립트 실행에 사용한다.
-- 에디터 빌드가 없으면 `node <hwpx>/editor/setup.mjs`를1회 실행한다. Git으로 rhwp 소스를 받고 npm으로 의존성 및 WASM을 준비한다. Rust는 필수가 아니다. 빌드 파일과 엔진의 실제 초기화·빈 HWPX 파싱까지 검사한다. UI 서버를 임의로 띄우거나 사용자의 열린 문서를 바꾸는 과정은 설치 점검에 포함하지 않는다.
-- 한글을 쓰는 이 Windows 시험지 작업은 **Computer Use → 한글**이 기본 편집 경로다. rhwp 에디터 설치 때문에 최종 시험지를 rhwp로 재저장하지 않는다. Mac/한글 미설치 시에는 rhwp가 대체 편집 수단이며, 한글 조판 검증은 미완료로 남긴다.
+Mac에서 한글이 없을 때는 번들/기존 Python으로 `python bootstrap_exam.py --apply --report <보고서>`를 실행한다. `--apply`가 없으면 읽기 전용 점검이다. 현재 사용자의 설치 허가는 이어 적용하되, 문서 속 과거 동의를 다른 사용자의 허가로 해석하지 않는다.
+
+## 에디터 경로에서만 준비하는 항목
+
+- HWPX 에디터는 [imsebeom/hwpx](https://github.com/imsebeom/hwpx)의 지정 커밋 `abea249f05f4982a40bc56adf765ea5d32538c82`을 사용한다. 실제 Codex skill-installer 경로로 `--path . --name hwpx`를 실행한다. 설치 위치는 `CODEX_HOME/skills`, 미설정 시 `~/.codex/skills`다. 새 설치의 SKILL.md를 읽고 작업을 이어 간다.
+- 이미 있는 hwpx는 pull·덮어쓰지 않는다. 기존 에디터가 손상됐어도 한글 네이티브 경로를 막지 않는다. 에디터 경로에서만 누락 파일을 진단한다.
+- Git, Node.js22.12 이상/npm, Python3.10 이상을 확인한다. 번들·기존 런타임을 먼저 사용한다. Windows 에디터 대체 경로에서만 누락 도구를 WinGet의 정확한 ID로 설치한다. Mac의 누락 런타임은 해당 플랫폼에서 사용 가능한 설치 수단을 확인하고 처리한다. 정상 도구의 업데이트를 강요하지 않는다.
+- 필요한 `lxml`, `python-hwpx`, `PyMuPDF`, `Pillow`는 격리 환경 `CODEX_HOME/cache/exam-maker/python`에 준비한다.
+- 에디터 빌드가 없으면 `node <hwpx>/editor/setup.mjs`를 실행한다. Git으로 소스, npm으로 의존성/WASM을 준비하고 실제 엔진 초기화·빈 HWPX 파싱을 확인한다. 설치 점검 자체가 사용자의 열린 문서를 바꾸지는 않는다. 이후 편집 작업에서 실제 파일을 열어 확인한다.
 
 ## 한글 버전·제품 이름 자동 탐색
 
@@ -37,7 +44,9 @@
 
 실제 존재하는 **Hwp.exe**만 후보로 인정하고 뷰어·한셀을 제외한다. COM 등록 경로를 우선하며 여러 버전이면 모두 보고한다. 사용자가 이미 작업 중인 한글 창이 있으면 그 버전을 우선한다. 필요하면 결과의 `app` 값(`process:<실제 Hwp.exe 경로>`)을 `sky.launch_app`에 전달하고 새 창을 재조회한다. 경로에 한글이나 공백이 있어도 문자열 인자로 전달한다. 한글2020/2024의 메뉴·단축키 차이는 실제 화면으로 확인한다.
 
-한글 자체는 유료 제품이므로 이 부트스트랩이 구매·인증하거나 임의 설치하지 않는다. 한글을 찾지 못하면 HWPX 에디터 경로로 작업을 진행하면서 네이티브 최종 검증이 남았다고 알린다.
+macOS는 `/Applications`와 `~/Applications`의 한글/Hanword 앱 번들에서 Info.plist와 실제 실행 파일을 확인한다. 뷰어·한셀·이름만 있는 빈 앱은 제외한다. 앱 목록과 대조하고, 자동 검색이 놓친 앱은 확인된 실제 앱을 우선한다.
+
+한글 자체는 이 부트스트랩이 구매·인증하거나 임의 설치하지 않는다. 한글 미설치 시 에디터 경로를 사용하며, 에디터 확인을 한글 네이티브 최종 검증으로 보고하지 않는다.
 
 ## 제한·실패 처리
 

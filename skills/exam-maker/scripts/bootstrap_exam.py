@@ -1,4 +1,4 @@
-"""Read-only by default; --apply installs missing exam/HWPX prerequisites.
+"""Prefer installed Hancom; only provision the editor when Hancom is absent.
 
 Uses Codex's skill-installer for the pinned public HWPX editor skill. Never
 overwrites an existing skill, launches Hancom, or changes the system PATH.
@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import plistlib
 from pathlib import Path
 import re
 import shutil
@@ -199,7 +200,41 @@ def scan_hancom(roots, records=()):
     return sorted(found.values(), key=rank, reverse=True)
 
 
+def scan_macos_hancom(roots):
+    """Recognize installed editor bundles, not viewers or name-only folders."""
+    found = {}
+    for root in roots:
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        for bundle in root.glob('*.app'):
+            if not re.search(r'hancom|hanword|hwp|한글|한컴', bundle.name, re.I):
+                continue
+            if re.search(r'viewer|뷰어', bundle.name, re.I):
+                continue
+            try:
+                info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
+                executable = info['CFBundleExecutable']
+                if not isinstance(executable, str) or Path(executable).name != executable:
+                    continue
+                binary = bundle / 'Contents/MacOS' / executable
+                if not binary.is_file():
+                    continue
+                # Office suites/other Hancom apps are not proof of Hanword.
+                identity = ' '.join([bundle.name, executable, str(info.get('CFBundleIdentifier', ''))])
+                if not re.search(r'hanword|hwp|한글', identity, re.I):
+                    continue
+                key = str(bundle.resolve())
+                found[key] = {'path': str(binary.resolve()), 'app': key,
+                              'sources': ['macOS application bundle']}
+            except (OSError, ValueError, KeyError, plistlib.InvalidFileException):
+                continue
+    return list(found.values())
+
+
 def discover_hancom():
+    if sys.platform == 'darwin':
+        return scan_macos_hancom([Path('/Applications'), Path.home() / 'Applications'])
     if os.name != 'nt':
         return []
     import winreg
@@ -263,6 +298,16 @@ def provision(args):
     dest = Path(args.skills_dir).expanduser().resolve() if args.skills_dir else home / 'skills'
     installer = Path(args.installer).resolve() if args.installer else home / 'skills/.system/skill-installer/scripts/install-skill-from-github.py'
     report = {'status': 'CHECKING', 'apply': args.apply, 'actions': [], 'hancom': discover_hancom()}
+    # Native editing does not depend on rhwp, Git, Node, or Python document
+    # packages. An incomplete pre-existing editor must not block this route.
+    if report['hancom'] and not getattr(args, 'editor', False):
+        report.update(status='READY', workflow='hancom', editor_required=False,
+                      editor_smoke={'status': 'SKIPPED_NATIVE'},
+                      native_layout_status='AVAILABLE_NOT_YET_VERIFIED',
+                      computer_use_status='CHECK_IN_AGENT',
+                      python=str(Path(sys.executable)))
+        return report
+    report.update(workflow='editor', editor_required=True)
     tools, actions = ensure_tools(args.apply, args.runtime_bin)
     report.update(tools=tools)
     report['actions'].extend(actions)
@@ -304,13 +349,15 @@ def provision(args):
         smoke = Path(__file__).with_name('check_editor.mjs')
         report['editor_smoke'] = json.loads(run([tools['node']['path'], smoke, skill], env=env))
     report['native_layout_status'] = 'AVAILABLE_NOT_YET_VERIFIED' if report['hancom'] else 'NOT_AVAILABLE'
-    report['status'] = 'READY' if all(tools.values()) and action != 'missing' and built and not missing else 'MISSING'
+    report['status'] = 'READY' if (all(tools.values()) and action != 'missing' and built
+                                  and not missing and report.get('editor_smoke', {}).get('status') == 'PASS') else 'MISSING'
     return report
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--apply', action='store_true')
+    p.add_argument('--editor', action='store_true', help='Explicitly requested editor even if Hancom is installed')
     p.add_argument('--codex-home', default=os.environ.get('CODEX_HOME', str(Path.home() / '.codex')))
     p.add_argument('--skills-dir', help='Isolated install destination for testing')
     p.add_argument('--installer', help='Actual Codex skill-installer helper path')
