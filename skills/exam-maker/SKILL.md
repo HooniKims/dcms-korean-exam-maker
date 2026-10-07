@@ -2,7 +2,7 @@
 name: exam-maker
 description: Infer the school subject and assessment needs from teacher-provided materials, then create original exam candidates and editable DOCX or HWPX documents with subject-specific answer and scoring checks. Use for 시험문제 출제, 중간고사·기말고사, 후보 문항, 출제 청사진, 성취기준 반영, 기출·출판사 문제 중복 검사, 난이도 조정, 원안지 편집, 학교 출제연수 지침 반영, or equivalent school-assessment work across subjects.
 metadata:
-  version: "1.10.5"
+  version: "1.10.6"
   updated: "2026-10-07"
 ---
 
@@ -75,7 +75,7 @@ For this teacher's exams, read [references/stem-balance.md](references/stem-bala
 
 Balance coverage through a blueprint rather than mechanically assigning one question to every guidebook detail. Use the derived subject profile to set assessed abilities, appropriate item formats, independent answer checks and partial-credit rules. Link each candidate to its actual source and assessment evidence. Recalculate score weights and expected mean whenever candidates are replaced.
 
-For middle-school Korean, use passages from the actual textbook and taught scope. Adapt useful CSAT-style reasoning to the grade level without imitating the CSAT's difficulty. Label passage paragraphs `(가)`, `(나)`, `(다)` in order and do not insert blank lines between them.
+For middle-school Korean, use passages from the actual textbook and taught scope. Adapt useful CSAT-style reasoning to the grade level without imitating the CSAT's difficulty. Label passage paragraphs `(가)`, `(나)`, `(다)` in order and do not insert blank lines between them. For this teacher, bold the entire passage-opening label, including parentheses, so the subdivisions are easy to find. Keep references to those labels in question stems and choices regular weight; do not bold a whole passage or globally replace every occurrence. See [references/korean-typography.md](references/korean-typography.md).
 
 For this teacher's Korean profile, apply the following fixed stem and marker rules to every exam-facing stem, passage, `<보기>`, and choice (details: section 5.5 of the Korean reference). For other subjects, follow applicable school rules and subject notation; do not insert Korean markers or change spacing inside equations, code or foreign-language source text:
 
