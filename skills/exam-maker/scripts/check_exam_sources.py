@@ -12,8 +12,9 @@ from check_exam_flow import NS,HP
 
 def citation_errors(text):
     errors=[]
-    if re.search(r'발췌|재구성|간추린|덧붙|생략|(?:\d+[~·,\d ]*)쪽|\d+차시',text):
-        errors.append('Student citation contains page/lesson numbers or editorial notes')
+    textbook_page_label=bool(re.fullmatch(r'- 국어 교과서 [1-9]\d*(?:~[1-9]\d*)?쪽',text))
+    if re.search(r'발췌|재구성|간추린|덧붙|생략|\d+차시',text) or (re.search(r'\d+[~·,\d ]*쪽',text) and not textbook_page_label):
+        errors.append('Use pages only in the confirmed textbook-page label; omit editorial notes and lesson numbers')
     if '「' in text or '」' in text:
         if not re.fullmatch(r'- [^,「」\n]+, 「[^「」\n]+」',text):
             errors.append('Use - confirmed author, 「work title」 without an editorial suffix')

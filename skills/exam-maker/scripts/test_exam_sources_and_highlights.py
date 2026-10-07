@@ -7,7 +7,8 @@ from check_exam_flow import HP,NS
 
 class SourceTests(unittest.TestCase):
     def test_hyphen_author_title_and_nonliterary_label(self):
-        for text in ('- 작가명, 「작품명」','- 작자 미상, 「이야기」','- 과학 교과서'):
+        for text in ('- 작가명, 「작품명」','- 작자 미상, 「이야기」','- 과학 교과서',
+                     '- 국어 교과서 52~53쪽','- 국어 교과서 92쪽'):
             self.assertEqual(citation_errors(text),[])
 
     def test_missing_hyphen_author_and_editorial_suffix(self):
