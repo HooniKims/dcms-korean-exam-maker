@@ -72,7 +72,7 @@ Hancom's official help describes `Keep source formatting` as retaining source st
 Render the entire DOCX to PDF and inspect every page.
 
 - Intermediate pages should normally use most of both columns. If a large lower region in both columns is empty while later content exists, reflow the content.
-- Some unused space on the final page is legitimate. Balance the last two columns when a simple manual column break improves readability without splitting an item.
+- Without a specific fill requirement, some final-page space is legitimate. This teacher explicitly requires every page, including the final page, to reach the lower body area: apply the continuation/bottom-space reference, distribute item-group spacing, and extend a real writing area when needed. Never stretch choice spacing. Move short passage openings with their guide to the next page.
 - Do not leave a stem at the bottom with all choices in the next column.
 - Avoid breaking a small table, figure, `<보기>`, or answer box from the item it supports.
 - Check that wider line spacing did not create a nearly empty extra page.

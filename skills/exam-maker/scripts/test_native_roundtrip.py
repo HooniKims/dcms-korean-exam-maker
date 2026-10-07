@@ -309,6 +309,17 @@ class PDFTests(unittest.TestCase):
         return check.compare_pdf(self.native,self.native,pdf,self.reference)[0]
 
     def test_printed_layout_unchanged(self): self.assertEqual(self.errors(),[])
+
+    def test_final_page_is_measured_when_explicitly_requested(self):
+        pdf = self.create_pdf('final-fill.pdf')
+        errors, detail = check.compare_pdf(self.native,self.native,pdf,self.reference,
+                                          measure_bottom_space=True,fill_final_page=True)
+        self.assertTrue(any('unused bottom space' in e for e in errors))
+        self.assertFalse(detail['pages'][0]['last_page_exempt_from_space_threshold'])
+        errors, detail = check.compare_pdf(self.native,self.native,pdf,self.reference,
+                                          measure_bottom_space=True)
+        self.assertFalse(any('unused bottom space' in e for e in errors))
+        self.assertTrue(detail['pages'][0]['last_page_exempt_from_space_threshold'])
     def test_missing_body_detected(self): self.assertTrue(any('missing/duplicate' in e for e in self.errors(body='alpha')))
     def test_duplicate_body_detected(self): self.assertTrue(any('missing/duplicate' in e for e in self.errors(body='alpha beta\nalpha beta')))
     def test_body_reordered_detected(self): self.assertTrue(any('reading order' in e for e in self.errors(body='beta alpha')))
@@ -381,7 +392,10 @@ class ContinuationTests(unittest.TestCase):
         doc.save(path);doc.close();return path
 
     def result(self, strict=False, warn_mm=None, fail_mm=None, **changes):
-        path=self.make_pdf('test.pdf',**changes)
+        # Each parameter case owns its PDF; avoid Windows replacement locks
+        # while repeatedly testing exceptions against the same fixture path.
+        self.result_counter=getattr(self,'result_counter',0)+1
+        path=self.make_pdf(f'test-{self.result_counter}.pdf',**changes)
         return check.compare_pdf(self.native,self.native,path,self.reference,continuation_markers=True,
                                  strict_body_layout=strict, bottom_space_warn_mm=warn_mm,
                                  bottom_space_fail_mm=fail_mm)

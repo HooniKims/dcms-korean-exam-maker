@@ -13,6 +13,33 @@ NS={'hp':'http://www.hancom.co.kr/hwpml/2011/paragraph','hh':'http://www.hancom.
 HP='{'+NS['hp']+'}';HH='{'+NS['hh']+'}';HC='{'+NS['hc']+'}'
 def compact(s):return re.sub(r'\s+','',s)
 
+def short_passage_start_errors(section,manifest,min_lines=5):
+ """Flag a few opening passage lines left on a page before a page turn.
+
+ Native line coordinates reset at column boundaries; two columns make a page.
+ A complete short passage is fine. Tables do not participate in this scan.
+ """
+ roles={p['paragraph_id']:p for b in manifest['blocks'] for p in b['paras']}
+ groups=[];group=None;column=0;last_y=-1
+ for p in section.findall(HP+'p'):
+  item=roles.get(p.get('id'),{});role=item.get('role')
+  if role=='guide':
+   group={'label':item.get('text',''),'pages':{}};groups.append(group)
+  elif role in ('stem','closing'):group=None
+  for line in p.findall('./hp:linesegarray/hp:lineseg',NS):
+   y=int(line.get('vertpos'))
+   if y<last_y:column+=1
+   last_y=y
+   if group is not None and role=='passage':
+    page=column//2+1;group['pages'][page]=group['pages'].get(page,0)+1
+ errors=[]
+ for group in groups:
+  if len(group['pages'])<2:continue
+  page=min(group['pages']);count=group['pages'][page]
+  if count<min_lines:
+   errors.append(f"Short passage opening on page {page}: {count} lines before page turn; move guide and opening together: {group['label']}")
+ return errors
+
 def overflow_break_errors(section):
  """Flag a forced break immediately after a paragraph already flowed onward.
 
@@ -59,7 +86,7 @@ def check(hwpx,pdf,manifest):
  with ZipFile(hwpx) as z:s=E.fromstring(z.read('Contents/section0.xml'));h=E.fromstring(z.read('Contents/header.xml'))
  ps={p.get('id'):p for p in s};cs={p.get('id'):p for p in h.findall('.//hh:charPr',NS)}
  pp={p.get('id'):p for p in h.findall('.//hh:paraPr',NS)}
- d=fitz.open(pdf);errors=overflow_break_errors(s);guides=[];aligned=[];numbers=[]
+ d=fitz.open(pdf);errors=overflow_break_errors(s)+short_passage_start_errors(s,m);guides=[];aligned=[];numbers=[]
  if len(d)!=m['pages_planned']:errors.append(f'Planned {m["pages_planned"]} pages; native PDF has {len(d)}')
  for ci,col in enumerate(m['columns']):
   if ci//2>=len(d):continue

@@ -1,6 +1,6 @@
 """Reject the previous split-range layout even when each half fits one line."""
 import unittest
-from check_exam_flow import instruction_errors, overflow_break_errors, HP
+from check_exam_flow import instruction_errors, overflow_break_errors, short_passage_start_errors, HP
 from lxml import etree as E
 
 
@@ -29,6 +29,33 @@ class NativeOverflowBreakTests(unittest.TestCase):
         lines=E.SubElement(p,HP+'linesegarray')
         for pos in [5000,0]:E.SubElement(lines,HP+'lineseg',vertpos=str(pos))
         self.assertEqual(overflow_break_errors(section),[])
+
+
+class ShortPassageOpeningTests(unittest.TestCase):
+    def fixture(self, opening_lines, cross_page=True, continuation=True):
+        s=E.Element('section');items=[]
+        def paragraph(pid,role,positions):
+            p=E.SubElement(s,HP+'p',id=pid)
+            lines=E.SubElement(p,HP+'linesegarray')
+            for y in positions:E.SubElement(lines,HP+'lineseg',vertpos=str(y))
+            items.append({'paragraph_id':pid,'role':role,'text':pid})
+        if cross_page:
+            paragraph('before','stem',[60000])
+            paragraph('right','stem',[3000])
+        paragraph('guide','guide',[60000])
+        paragraph('opening','passage',[62000+i*1600 for i in range(opening_lines)])
+        if continuation:paragraph('continued','passage',[3000,4600,6200])
+        return s,{'blocks':[{'paras':items}]}
+
+    def test_three_lines_before_next_page_fail(self):
+        self.assertTrue(short_passage_start_errors(*self.fixture(3)))
+
+    def test_substantial_opening_and_complete_short_passage_pass(self):
+        self.assertEqual(short_passage_start_errors(*self.fixture(6)),[])
+        self.assertEqual(short_passage_start_errors(*self.fixture(3,continuation=False)),[])
+
+    def test_same_page_column_continuation_is_not_a_page_turn(self):
+        self.assertEqual(short_passage_start_errors(*self.fixture(3,cross_page=False)),[])
 
 
 class CommonInstructionTests(unittest.TestCase):

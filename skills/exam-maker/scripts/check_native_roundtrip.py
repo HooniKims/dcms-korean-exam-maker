@@ -557,16 +557,17 @@ def bottom_space(body, strokes, frame, marker_lines, middle, header_bottom, body
 
 def compare_pdf(prepared, native, pdf, reference_pdf, continuation_markers=False,
                 measure_bottom_space=False, strict_body_layout=False,
-                bottom_space_warn_mm=None, bottom_space_fail_mm=None):
+                bottom_space_warn_mm=None, bottom_space_fail_mm=None, fill_final_page=False):
     import fitz
     errors, details = [], {'pages': [], 'warnings': []}
     warn_mm = (6 if strict_body_layout else 20) if bottom_space_warn_mm is None else bottom_space_warn_mm
     fail_mm = (10 if strict_body_layout else 40) if bottom_space_fail_mm is None else bottom_space_fail_mm
     if not all(math.isfinite(v) for v in (warn_mm, fail_mm)) or not 0 <= warn_mm < fail_mm:
         raise ValueError('Bottom-space thresholds must be finite and 0 <= warning < failure')
-    measure_space = (continuation_markers or measure_bottom_space or strict_body_layout or
+    measure_space = (fill_final_page or continuation_markers or measure_bottom_space or strict_body_layout or
                      bottom_space_warn_mm is not None or bottom_space_fail_mm is not None)
     details['bottom_space_policy'] = {'strict_body_layout': strict_body_layout,
+        'fill_final_page': fill_final_page,
         'warning_mm': warn_mm, 'failure_mm': fail_mm, 'marker_clearance_pt': 2,
         'text_edge_rounding_tolerance_pt': .3 if strict_body_layout else None}
     content, size_counts = [], Counter()
@@ -691,8 +692,8 @@ def compare_pdf(prepared, native, pdf, reference_pdf, continuation_markers=False
                 space = bottom_space(body,strokes,frame,marker_lines,page.rect.width/2,header_bottom,
                                      body_geometry['body_bottom_y_pt'] if body_geometry else None)
                 page_detail['bottom_space'] = space
-                page_detail['last_page_exempt_from_space_threshold'] = index == len(doc)-1
-                if index < len(doc)-1:
+                page_detail['last_page_exempt_from_space_threshold'] = index == len(doc)-1 and not fill_final_page
+                if index < len(doc)-1 or fill_final_page:
                     for col in space:
                         gap = col['unused_height_mm']
                         msg = f'{col["column"]} column unused bottom space {gap:.1f} mm'
@@ -723,7 +724,7 @@ def compare_pdf(prepared, native, pdf, reference_pdf, continuation_markers=False
 
 def run(prepared_path, native_path, pdf_path, reference_pdf, expected_header=None, replacements=None,
         continuation_markers=False, measure_bottom_space=False, strict_body_layout=False,
-        bottom_space_warn_mm=None, bottom_space_fail_mm=None, passage_manifest=None):
+        bottom_space_warn_mm=None, bottom_space_fail_mm=None, passage_manifest=None, fill_final_page=False):
     prepared, native = Document(prepared_path), Document(native_path)
     xml_errors, semantic = compare_documents(prepared, native, replacements, expected_header)
     if passage_manifest is not None:
@@ -733,7 +734,7 @@ def run(prepared_path, native_path, pdf_path, reference_pdf, expected_header=Non
             semantic[name + '_passage_borders'] = border_details
     pdf_errors, pdf_details = compare_pdf(prepared, native, pdf_path, reference_pdf,
                                          continuation_markers, measure_bottom_space, strict_body_layout,
-                                         bottom_space_warn_mm, bottom_space_fail_mm)
+                                         bottom_space_warn_mm, bottom_space_fail_mm, fill_final_page)
     errors = xml_errors + pdf_errors
     return {'status': 'FAIL' if errors else ('WARN' if pdf_details['warnings'] else 'PASS'), 'errors': errors,
             'warnings':pdf_details['warnings'],
@@ -757,6 +758,7 @@ def main():
     p.add_argument('--continuation-markers', action='store_true',help='Validate continuation markers and bottom space')
     p.add_argument('--measure-bottom-space', action='store_true',help='Validate column bottom space without requiring markers')
     p.add_argument('--strict-body-layout', action='store_true',help='Use scaled HWPX body bottom; defaults to 6 mm warning / 10 mm failure')
+    p.add_argument('--fill-final-page', action='store_true',help='Apply bottom-space thresholds to the final page too')
     p.add_argument('--bottom-space-warn-mm', type=float,help='Override unused-space warning threshold; also enables measurement')
     p.add_argument('--bottom-space-fail-mm', type=float,help='Override unused-space failure threshold; also enables measurement')
     p.add_argument('--passage-manifest', type=Path,help='JSON blocks/paras with role=passage or citation; require connected black 0.1 mm paragraph borders')
@@ -766,7 +768,7 @@ def main():
         report = run(args.prepared, args.native, args.pdf, args.reference_pdf,
                      load(args.expected_header), load(args.text_replacements),
                      args.continuation_markers, args.measure_bottom_space, args.strict_body_layout,
-                     args.bottom_space_warn_mm, args.bottom_space_fail_mm, load(args.passage_manifest))
+                     args.bottom_space_warn_mm, args.bottom_space_fail_mm, load(args.passage_manifest), args.fill_final_page)
     except Exception as e:
         report = {'status': 'FAIL', 'errors': [f'{type(e).__name__}: {e}'], 'visual_status': 'NOT_CHECKED'}
     if hasattr(sys.stdout, 'reconfigure'):
