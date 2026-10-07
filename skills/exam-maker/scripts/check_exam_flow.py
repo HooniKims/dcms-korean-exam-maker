@@ -12,6 +12,24 @@ import fitz
 NS={'hp':'http://www.hancom.co.kr/hwpml/2011/paragraph','hh':'http://www.hancom.co.kr/hwpml/2011/head','hc':'http://www.hancom.co.kr/hwpml/2011/core'}
 HP='{'+NS['hp']+'}';HH='{'+NS['hh']+'}';HC='{'+NS['hc']+'}'
 def compact(s):return re.sub(r'\s+','',s)
+
+def overflow_break_errors(section):
+ """Flag a forced break immediately after a paragraph already flowed onward.
+
+ Read only top-level native line caches; table-cell coordinates are unrelated.
+ An intentional double break still needs review, so never remove it here.
+ """
+ errors=[];previous=None
+ for paragraph in section.findall(HP+'p'):
+  if previous is not None and paragraph.get('columnBreak')=='1':
+   lines=previous.findall('./hp:linesegarray/hp:lineseg',NS)
+   positions=[int(line.get('vertpos')) for line in lines if line.get('vertpos') is not None]
+   if any(b<a for a,b in zip(positions,positions[1:])):
+    errors.append('Forced column break after native paragraph overflow: '+
+                  str(previous.get('id'))+' -> '+str(paragraph.get('id'))+
+                  '; inspect for a skipped column before retaining the break')
+  previous=paragraph
+ return errors
 def instruction_errors(text, role='guide'):
  errors=[]
  if role=='guide_range':errors.append('Question range is separated from instruction: '+text)
@@ -41,7 +59,7 @@ def check(hwpx,pdf,manifest):
  with ZipFile(hwpx) as z:s=E.fromstring(z.read('Contents/section0.xml'));h=E.fromstring(z.read('Contents/header.xml'))
  ps={p.get('id'):p for p in s};cs={p.get('id'):p for p in h.findall('.//hh:charPr',NS)}
  pp={p.get('id'):p for p in h.findall('.//hh:paraPr',NS)}
- d=fitz.open(pdf);errors=[];guides=[];aligned=[];numbers=[]
+ d=fitz.open(pdf);errors=overflow_break_errors(s);guides=[];aligned=[];numbers=[]
  if len(d)!=m['pages_planned']:errors.append(f'Planned {m["pages_planned"]} pages; native PDF has {len(d)}')
  for ci,col in enumerate(m['columns']):
   if ci//2>=len(d):continue
