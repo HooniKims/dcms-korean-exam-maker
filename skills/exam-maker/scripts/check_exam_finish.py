@@ -1,4 +1,4 @@
-"""Check ASCII tilde rendering, score-only right alignment and final separator.
+"""Check ASCII tildes, score alignment and every separator's body-bottom endpoint.
 
 Requires the matching authoring manifest and a newly exported native PDF.
 Pixel review of each changed page remains required.
@@ -9,6 +9,7 @@ import argparse,json,re,math
 from lxml import etree as E
 import fitz
 from check_exam_flow import NS,HP,HH,HC,rows,compact
+from check_native_roundtrip import Document,native_body_bottom
 
 def vertical_segments(page):
  segs=[]
@@ -18,7 +19,26 @@ def vertical_segments(page):
    a,b=item[1:3]
    if abs(a.x-b.x)<.2 and abs(a.x-page.rect.width/2)<3 and abs(a.y-b.y)>2:
     segs.append((min(a.y,b.y),max(a.y,b.y),a.x,drawing['width']))
- return sorted(segs)
+ if not segs:return []
+ # A narrow example/condition table can have an edge within three points of
+ # the gutter. Track the actual center rule instead of joining those edges.
+ main=max(segs,key=lambda seg:seg[1]-seg[0]);center_x=main[2]
+ # Outlined header glyphs can also contain tiny vertical strokes at center.
+ return sorted(seg for seg in segs if abs(seg[2]-center_x)<=.3 and seg[0]>=main[0]-.3)
+
+def separator_errors(segments,target,page_number):
+ """Compare against the page's text-area bottom, never another shortened rule."""
+ prefix=f'Page {page_number}: '
+ if not segments:return [prefix+'missing column separator']
+ segments=sorted(segments);end=segments[0][1];x=segments[0][2];width=segments[0][3];errors=[]
+ for start,stop,other_x,other_width in segments[1:]:
+  if start>end+.8:errors.append(prefix+'gap in column separator')
+  if abs(other_x-x)>.3:errors.append(prefix+'separator extension shifted horizontally')
+  if abs(other_width-width)>.05:errors.append(prefix+'separator extension weight differs')
+  end=max(end,stop)
+ if end<target-.8:errors.append(prefix+f'column separator ends early: {end:.3f} < {target:.3f}')
+ if end>target+.8:errors.append(prefix+f'column separator extends too far: {end:.3f} > {target:.3f}')
+ return errors
 
 def check(hwpx,pdf,manifest):
  m=json.loads(Path(manifest).read_text(encoding='utf-8-sig'))
@@ -76,19 +96,12 @@ def check(hwpx,pdf,manifest):
     gap=right-row[-1]['bbox'][2]
     if abs(gap)>1.5:errors.append(f'{prefix} score right edge off column by {gap:.3f} pt')
     scores.append({'number':prefix,'page':ci//2+1,'column':ci%2+1,'score':item['score_text'],'right_gap_pt':round(gap,3)})
- segments=[vertical_segments(page) for page in d]
- if not all(segments):errors.append('Missing column separator')
- else:
-  target=max(seg[1] for page in segments[:-1] for seg in page) if len(segments)>1 else segments[-1][0][1]
-  end=segments[-1][0][1];start=segments[-1][0][0];x=segments[-1][0][2]
-  for seg in segments[-1][1:]:
-   if seg[0]>end+.8:errors.append('Gap in final column separator')
-   if abs(seg[2]-x)>.3:errors.append('Final separator extension shifted horizontally')
-   if abs(seg[3]-segments[-1][0][3])>.05:errors.append('Final separator extension weight differs')
-   end=max(end,seg[1])
-  if end<target-.8:errors.append(f'Final column separator ends early: {end:.3f} < {target:.3f}')
-  if end>target+.8:errors.append(f'Final column separator extends too far: {end:.3f} > {target:.3f}')
- return {'status':'FAIL' if errors else 'PASS','tilde_count':len(tildes),'tildes':tildes,'score_lines':scores,'separator_segments':segments,'errors':errors}
+ document=Document(hwpx);segments=[];bottoms=[]
+ for pi,page in enumerate(d,1):
+  segs=vertical_segments(page);geometry=native_body_bottom(document,page)
+  target=geometry['body_bottom_y_pt'];segments.append(segs);bottoms.append(geometry)
+  errors.extend(separator_errors(segs,target,pi))
+ return {'status':'FAIL' if errors else 'PASS','tilde_count':len(tildes),'tildes':tildes,'score_lines':scores,'separator_segments':segments,'separator_body_bottoms':bottoms,'errors':errors}
 
 if __name__=='__main__':
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('hwpx');p.add_argument('--pdf',required=True);p.add_argument('--manifest',required=True);a=p.parse_args()

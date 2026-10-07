@@ -1,7 +1,7 @@
 """Refine a native exam using its authoring manifest and matching Hancom PDF.
 
 Keep ASCII tildes but use a centered Latin glyph. Move orphaned/split trailing
-scores into right-aligned paragraphs. Extend only the final column separator.
+scores into right-aligned paragraphs. Extend every separator to the body bottom.
 Always reopen/export in Hancom and run all layout checks after this operation.
 """
 from pathlib import Path
@@ -10,6 +10,8 @@ import argparse,copy,json,re
 from lxml import etree as E
 import fitz
 from check_exam_flow import rows,compact,NS,HP,HH,HC
+from check_exam_finish import vertical_segments,separator_errors
+from check_native_roundtrip import Document,native_body_bottom
 
 def clone_style(pool,source):
  n=copy.deepcopy(source);n.set('id',str(len(pool)));pool.append(n);pool.set('itemCnt',str(len(pool)));return n
@@ -50,11 +52,39 @@ def extend_line(anchor,ident,x,y0,y1,width):
  run=E.SubElement(anchor,HP+'run',charPrIDRef=anchor.find(HP+'run').get('charPrIDRef'));run.append(line)
  return line
 
+def extend_separators(section,pdf,manifest,paragraphs,next_id,document):
+ """Use actual PDF line ends and native page margins; preserve body flow."""
+ extensions=[]
+ for pi,page in enumerate(pdf):
+  segs=vertical_segments(page)
+  if not segs:raise ValueError(f'Page {pi+1}: cannot identify native column separator')
+  start=max(seg[1] for seg in segs);x=segs[0][2];width=segs[0][3]
+  # A repair here only extends an intact rule; gaps/shifted pieces need inspection.
+  issues=separator_errors(segs,start,pi+1)
+  if issues:raise ValueError('; '.join(issues))
+  geometry=native_body_bottom(document,page);end=geometry['body_bottom_y_pt'];scale=geometry['pdf_y_scale']
+  if start>end+.8:raise ValueError(f'Page {pi+1}: separator extends below body bottom')
+  if end-start<=.8:continue
+  num=rb'[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?'
+  matrices=[list(map(float,v.split())) for v in re.findall(rb'('+rb'\s+'.join([num]*6)+rb')\s+cm\b',page.read_contents())]
+  matrix=next((v for v in matrices if .11<v[0]<.13 and -.13<v[3]<-.11 and abs(v[1])+abs(v[2])<1e-9),None)
+  if matrix:xscale=matrix[0]/.12
+  else:
+   pagepr=next(section.iter(HP+'pagePr'));xscale=page.rect.width/(float(pagepr.get('width'))/100)
+  first=manifest['blocks'][manifest['columns'][pi*2][0]]['paras'][0]
+  anchor=paragraphs[first['paragraph_id']]
+  extend_line(anchor,next_id,round(x/xscale*100),round(start/scale*100)-5,
+              round(geometry['source_body_bottom_pt']*100),round(width*100))
+  extensions.append({'page':pi+1,'x_pt':x,'start_y_pt':start,'end_y_pt':end,'scale':scale,'object_id':str(next_id)})
+  next_id+=1
+ manifest['separator_extensions']=extensions
+ return extensions
+
 def refine(source,pdf,manifest,target,out_manifest):
  with ZipFile(source) as z:infos=z.infolist();parts={i.filename:z.read(i) for i in infos}
  s=E.fromstring(parts['Contents/section0.xml']);h=E.fromstring(parts['Contents/header.xml'])
  m=json.loads(Path(manifest).read_text(encoding='utf-8-sig'));d=fitz.open(pdf)
- if m.get('separator_extension') or any(p.get('score_paragraph_id') for b in m['blocks'] for p in b['paras']):
+ if m.get('separator_extension') or m.get('separator_extensions') or m.get('full_height_column_rules') or any(p.get('score_paragraph_id') for b in m['blocks'] for p in b['paras']):
   raise ValueError('Already refined: use a fresh matching native baseline, not a second extension')
  if len(d)!=m['pages_planned']:raise ValueError('PDF does not match manifest')
  ps={p.get('id'):p for p in s};pp=h.find('.//'+HH+'paraProperties');cp=h.find('.//'+HH+'charProperties')
@@ -115,21 +145,7 @@ def refine(source,pdf,manifest,target,out_manifest):
     nr=E.Element(HP+'run',charPrIDRef=cache[rid] if text=='~' else rid);E.SubElement(nr,HP+'t').text=text;p.insert(at,nr);at+=1
     tilde_count+=text=='~'
    p.remove(run)
- separators=[]
- for page in d:
-  candidates=[sh for sh in page.get_drawings() if abs(sh['rect'].x0-page.rect.width/2)<3 and sh['rect'].width<.1 and sh['rect'].height>200]
-  if len(candidates)!=1:raise ValueError('Cannot identify native column separator')
-  separators.append(candidates[0])
- last=separators[-1];end=max(sh['rect'].y1 for sh in separators[:-1]);start=last['rect'].y1
- if end-start>1:
-  # Hancom PDF uses a ~0.9989 vertical scale. Derive it from the actual page operators.
-  data=d[-1].read_contents();num=rb'[-+]?(?:\d*\.\d+|\d+)'
-  matrices=[list(map(float,x.split())) for x in re.findall(rb'('+rb'\s+'.join([num]*6)+rb')\s+cm',data)]
-  matrix=next((v for v in matrices if .11<v[0]<.13 and -.13<v[3]<-.11 and abs(v[1])+abs(v[2])<1e-9),None)
-  scale=-matrix[3]/.12 if matrix else 1;xscale=matrix[0]/.12 if matrix else 1
-  first=m['blocks'][m['columns'][-2][0]]['paras'][0];anchor=ps[first['paragraph_id']]
-  extend_line(anchor,nid,round(last['rect'].x0/xscale*100),round(start/scale*100)-5,round(end/scale*100),round(last['width']*100))
-  m['separator_extension']={'page':len(d),'x_pt':last['rect'].x0,'start_y_pt':start,'end_y_pt':end,'scale':scale,'object_id':str(nid)}
+ extensions=extend_separators(s,d,m,ps,nid,Document(source))
  # Native Hancom must calculate fresh line positions after text/style/control changes.
  for lines in s.findall('.//hp:linesegarray',NS):lines.getparent().remove(lines)
  parts['Contents/section0.xml']=E.tostring(s,xml_declaration=True,encoding='UTF-8',standalone=True)
@@ -137,7 +153,7 @@ def refine(source,pdf,manifest,target,out_manifest):
  with ZipFile(target,'w') as z:
   for info in infos:z.writestr(info,parts[info.filename])
  Path(out_manifest).write_text(json.dumps(m,ensure_ascii=False,indent=2),encoding='utf8')
- return {'tilde_characters':tilde_count,'score_lines':score_changes,'separator':m.get('separator_extension')}
+ return {'tilde_characters':tilde_count,'score_lines':score_changes,'separator_extensions':extensions}
 
 if __name__=='__main__':
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('source');p.add_argument('--pdf',required=True);p.add_argument('--manifest',required=True);p.add_argument('--output',required=True);p.add_argument('--output-manifest',required=True);a=p.parse_args()
