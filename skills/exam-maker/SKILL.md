@@ -2,7 +2,7 @@
 name: exam-maker
 description: Infer the school subject and assessment needs from teacher-provided materials, then create original exam candidates and editable DOCX or HWPX documents with subject-specific answer and scoring checks. Use for 시험문제 출제, 중간고사·기말고사, 후보 문항, 출제 청사진, 성취기준 반영, 기출·출판사 문제 중복 검사, 난이도 조정, 원안지 편집, 학교 출제연수 지침 반영, or equivalent school-assessment work across subjects.
 metadata:
-  version: "1.10.2"
+  version: "1.10.3"
   updated: "2026-10-07"
 ---
 

@@ -29,6 +29,13 @@ def style_errors(style, kind):
                 row.append(None)
             else:
                 row.append(int(item.get('value')))
+        # Hancom 2024 serializes the legacy default margin at twice the
+        # HwpUnitChar case value, even though both say unit="HWPUNIT".
+        parent = margin.getparent()
+        if parent.tag == '{%s}default' % NS['hp']:
+            case = parent.getparent().find('hp:case', NS)
+            if case is not None and case.get('{%s}required-namespace' % NS['hp']) == 'http://www.hancom.co.kr/hwpml/2016/HwpUnitChar':
+                row = [None if value is None else value / 2 for value in row]
         values.append(row)
         left, right, intent = row
         if left != right or intent != 0:
@@ -47,7 +54,7 @@ def style_errors(style, kind):
         right = int(border.get('offsetRight', '0'))
         if left != right:
             errors.append('Passage border padding differs left/right')
-        if border.get('ignoreMargin') != '0':
+        if border.get('ignoreMargin') != '1':
             errors.append('Passage border must respect paragraph margins')
         if left <= 0 or right <= 0:
             errors.append('Passage border needs positive text padding')

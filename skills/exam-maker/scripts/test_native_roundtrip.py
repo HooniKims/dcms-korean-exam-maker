@@ -201,6 +201,11 @@ class SemanticTests(unittest.TestCase):
         border.set('connect', '0')
         self.assertTrue(any('connect must be 1' in e for e in check.passage_border_checks(self.result(), manifest)[0]))
 
+    def test_inset_paragraph_border_is_valid(self):
+        manifest, border, fill = self.bordered_passage()
+        border.set('ignoreMargin', '1')
+        self.assertEqual(check.passage_border_checks(self.result(), manifest)[0], [])
+
     def test_passage_wrong_edge_width_fails(self):
         manifest, border, fill = self.bordered_passage()
         check.child(fill, 'bottomBorder').set('width', '0.12 mm')

@@ -488,8 +488,10 @@ def passage_border_checks(document, manifest):
             attrs = borders[0][1]
             if attrs.get('connect') != '1':
                 problems.append('connect must be 1')
-            if attrs.get('ignoreMargin') != '0':
-                problems.append('ignoreMargin must be 0')
+            # Both historical full-column and inset paragraph frames are valid.
+            # The symmetric-margin checker separately enforces inset geometry.
+            if attrs.get('ignoreMargin') not in ('0', '1'):
+                problems.append('ignoreMargin must be a valid boolean')
             fill = attrs.get('borderFillIDRef')
             sides = {n[0]: n[1] for n in fill[3]} if isinstance(fill, list) else {}
             for edge in ('leftBorder', 'rightBorder', 'topBorder', 'bottomBorder'):
